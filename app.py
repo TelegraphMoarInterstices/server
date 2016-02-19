@@ -1,6 +1,4 @@
 from flask import Flask, request, jsonify, make_response, current_app
-# from flask.ext import restful
-# from flask.ext.restful import Api
 from datetime import timedelta
 from functools import update_wrapper
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -8,9 +6,13 @@ from flask.ext.heroku import Heroku
 from flask.ext.cors import CORS
 from os.path import join, dirname
 from dotenv import load_dotenv
+from collections import OrderedDict
+from psycopg2.extensions import adapt, register_adapter, AsIs
+
 import flask.ext.restless
 import os
-import json
+import json, ast
+import ast
 
 
 app = Flask(__name__, instance_relative_config=True)
@@ -18,58 +20,11 @@ app.config['DEBUG'] = True
 heroku = Heroku(app)
 CORS(app, resources=r'/*', allow_headers='Content-Type')
 
-# api = restful.Api(app)
-
 app.config.from_pyfile('config.py')
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 db = SQLAlchemy(app)
-
-# CORS Snippet
-
-# def crossdomain(origin=None, methods=None, headers=None,
-#                 max_age=21600, attach_to_all=True,
-#                 automatic_options=True):
-#     if methods is not None:
-#         methods = ', '.join(sorted(x.upper() for x in methods))
-#     if headers is not None and not isinstance(headers, basestring):
-#         headers = ', '.join(x.upper() for x in headers)
-#     if not isinstance(origin, basestring):
-#         origin = ', '.join(origin)
-#     if isinstance(max_age, timedelta):
-#         max_age = max_age.total_seconds()
-#
-#     def get_methods():
-#         if methods is not None:
-#             return methods
-#
-#         options_resp = current_app.make_default_options_response()
-#         return options_resp.headers['allow']
-#
-#     def decorator(f):
-#         def wrapped_function(*args, **kwargs):
-#             if automatic_options and request.method == 'OPTIONS':
-#                 resp = current_app.make_default_options_response()
-#             else:
-#                 resp = make_response(f(*args, **kwargs))
-#             if not attach_to_all and request.method != 'OPTIONS':
-#                 return resp
-#
-#             h = resp.headers
-#             h['Access-Control-Allow-Origin'] = origin
-#             h['Access-Control-Allow-Methods'] = get_methods()
-#             h['Access-Control-Max-Age'] = str(max_age)
-#             h['Access-Control-Allow-Credentials'] = 'true'
-#             h['Access-Control-Allow-Headers'] = \
-#                 "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-#             if headers is not None:
-#                 h['Access-Control-Allow-Headers'] = headers
-#             return resp
-#
-#         f.provide_automatic_options = False
-#         return update_wrapper(wrapped_function, f)
-#     return decorator
 
 class User(db.Model):
     __tablename__ = "user"
@@ -90,21 +45,21 @@ class Bookmark(db.Model):
     __tablename__ = "bookmark"
 
     id = db.Column(db.Integer, primary_key=True)
-    search = db.Column(db.String())
+    search = db.Column(db.String(200))
     date = db.Column(db.Date())
     notes = db.Column(db.String())
     title = db.Column(db.String())
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
-    def __init__(self, search, date_created, notes, title, user_id):
+    def __init__(self, search, date, notes, title, user_id):
         self.search = search
-        self.date_created = date_created
+        self.date = date
         self.notes = notes
         self.title = title
         self.user_id = user_id
 
-db.create_all()
-db.session.commit()
+# db.create_all()
+# db.session.commit()
 
 manager = flask.ext.restless.APIManager(app, flask_sqlalchemy_db=db)
 
@@ -119,13 +74,58 @@ def hello():
     return "Hello World"
 
 @app.route("/add_bookmark", methods=['POST'])
-# @crossdomain(origin='https://twig-of-life.herokuapp.com')
 def add_bookmark():
 
-    result = request.get_data()
-    print result
+    form_data = json.dumps(request.json)
 
-    # another_bookmark = db.engine.execute("INSERT INTO bookmark VALUES (default, 'now', 'New search 2', 1, 'Yeahh buddy');")
+    middle_data = json.loads(form_data)
+
+    loop_data = ast.literal_eval(json.dumps(middle_data))
+
+    print type(form_data)
+    print type(middle_data)
+    # print type(almost_data)
+    print type(loop_data)
+    print form_data
+    print middle_data
+    # print almost_data
+    print loop_data
+
+    user_id_value = str(loop_data['user_id'])
+    title_value = str(loop_data['title'])
+    notes_value = str(loop_data['notes'])
+    search_value = str(loop_data['search'])
+
+
+
+    # for key, elem in loop_data.items():
+    #     if key == 'user_id':
+    #         global user_id_value
+    #         print key
+    #         user_id_value = adapt(elem).getquoted()
+    #     elif key == 'title':
+    #         global title_value
+    #         print key
+    #         title_value = adapt(elem).getquoted()
+    #     elif key == 'notes':
+    #         global notes_value
+    #         print key
+    #         notes_value = adapt(elem).getquoted()
+    #     elif key == 'search':
+    #         global search_value
+    #         print key
+    #         search_value = adapt(elem).getquoted()
+    #     else:
+    #         print "didn't work"
+
+    print user_id_value
+    print title_value
+    print notes_value
+    print search_value
+
+    new_bookmark = Bookmark(search_value, "now", notes_value, title_value, user_id_value)
+    db.session.add(new_bookmark)
+    db.session.commit()
 
     print "Bookmark added"
     return jsonify(result={"status": 200})
